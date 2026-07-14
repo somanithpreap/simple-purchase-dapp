@@ -49,10 +49,12 @@ export async function updateProduct(id: string, sellerId: string, input: UpdateP
 
 export async function deleteProduct(id: string, sellerId: string) {
   await getOwnedProduct(id, sellerId);
-  const orderCount = await prisma.order.count({ where: { productId: id } });
-  if (orderCount > 0) {
+  const activeOrderCount = await prisma.order.count({
+    where: { productId: id, status: { in: ["PENDING", "ESCROWED"] } },
+  });
+  if (activeOrderCount > 0) {
     throw new HttpError(
-      "This product has existing orders and cannot be removed. Set its stock to 0 to stop new purchases.",
+      "This product has pending or escrowed orders and cannot be removed. Set its stock to 0 to stop new purchases.",
       409,
     );
   }
