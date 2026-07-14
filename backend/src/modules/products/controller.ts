@@ -57,3 +57,12 @@ export const updateProductHandler: RequestHandler = async (req, res, next) => {
     next(err);
   }
 };
+
+export const deleteProductHandler: RequestHandler = async (req, res, next) => {
+  try {
+    await productService.deleteProduct(getParam(req.params.id), req.user!.sub);
+    res.status(204).end();
+  } catch (err) {
+    next(err);
+  }
+};

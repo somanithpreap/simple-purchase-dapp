@@ -67,15 +67,16 @@ export default function ProductsPage() {
     <div>
       <h1>Products</h1>
       {message && <p className="notice">{message}</p>}
-      {products.length === 0 && <p>No products listed yet.</p>}
+      {products.length === 0 && <p className="muted">No products listed yet.</p>}
       <div className="grid">
         {products.map((p) => (
-          <div className="card" key={p.id}>
+          <div className="card product-card" key={p.id}>
             {p.imageUrl && <img src={p.imageUrl} alt={p.name} className="product-image" />}
             <h3>{p.name}</h3>
-            <p>{p.description}</p>
+            <p className="muted">{p.description}</p>
             <p>
-              <strong>{weiToEth(p.priceWei)} ETH</strong> &middot; {p.stockQty} in stock
+              <span className="price">{weiToEth(p.priceWei)} ETH</span>{" "}
+              <span className="muted">&middot; {p.stockQty} in stock</span>
             </p>
             {user?.role === "CUSTOMER" && (
               <div className="buy-row">

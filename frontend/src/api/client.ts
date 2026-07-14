@@ -63,6 +63,10 @@ export function updateStock(token: string, productId: string, stockQty: number) 
   );
 }
 
+export function deleteProduct(token: string, productId: string) {
+  return request<null>(`/products/${productId}`, { method: "DELETE" }, token);
+}
+
 export function purchaseProduct(token: string, productId: string, quantity: number) {
   return request<PendingOrder>(
     "/orders",
@@ -89,10 +93,6 @@ export function listMyOrders(token: string) {
 
 export function listSellerOrders(token: string) {
   return request<Order[]>("/orders/seller", {}, token);
-}
-
-export function getBalance(token: string) {
-  return request<{ walletAddress: string; balanceWei: string }>("/auth/me/balance", {}, token);
 }
 
 export function getContractInfo() {

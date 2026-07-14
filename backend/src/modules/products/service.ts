@@ -46,3 +46,15 @@ export async function updateProduct(id: string, sellerId: string, input: UpdateP
   await getOwnedProduct(id, sellerId);
   return prisma.product.update({ where: { id }, data: input });
 }
+
+export async function deleteProduct(id: string, sellerId: string) {
+  await getOwnedProduct(id, sellerId);
+  const orderCount = await prisma.order.count({ where: { productId: id } });
+  if (orderCount > 0) {
+    throw new HttpError(
+      "This product has existing orders and cannot be removed. Set its stock to 0 to stop new purchases.",
+      409,
+    );
+  }
+  await prisma.product.delete({ where: { id } });
+}

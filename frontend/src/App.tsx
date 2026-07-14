@@ -1,8 +1,6 @@
-import { Navigate, Route, Routes, Link, useNavigate } from "react-router-dom";
-import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { Navigate, Route, Routes, Link, NavLink, useNavigate } from "react-router-dom";
+import type { ReactNode } from "react";
 import { useAuth } from "./context/AuthContext";
-import { getBalance } from "./api/client";
-import { weiToEth } from "./utils/format";
 import WalletConnect from "./components/WalletConnect";
 import LoginPage from "./pages/LoginPage";
 import RegisterPage from "./pages/RegisterPage";
@@ -17,64 +15,47 @@ function RequireAuth({ children }: { children: ReactNode }) {
 }
 
 function NavBar() {
-  const { user, token, logout } = useAuth();
+  const { user, logout } = useAuth();
   const navigate = useNavigate();
-  const [balanceWei, setBalanceWei] = useState<string | null>(null);
-
-  const refreshBalance = useCallback(() => {
-    if (!token || !user?.walletAddress) return;
-    getBalance(token)
-      .then((res) => setBalanceWei(res.balanceWei))
-      .catch(() => setBalanceWei(null));
-  }, [token, user?.walletAddress]);
-
-  useEffect(() => {
-    if (!token || !user?.walletAddress) {
-      setBalanceWei(null);
-      return;
-    }
-    refreshBalance();
-  }, [token, user?.walletAddress, refreshBalance]);
 
   return (
-    <nav>
-      <Link to="/products">Products</Link>
-      {user?.role === "CUSTOMER" && <Link to="/orders">My orders</Link>}
-      {user?.role === "SELLER" && <Link to="/seller">Seller dashboard</Link>}
-      <span className="spacer" />
-      {user ? (
-        <>
-          <span>
-            {user.email} ({user.role})
-          </span>
-          {user.walletAddress ? (
-            balanceWei !== null && (
-              <span>
-                {weiToEth(balanceWei)} ETH{" "}
-                <button onClick={refreshBalance} title="Refresh balance">
-                  ⟳
-                </button>
-              </span>
-            )
-          ) : (
-            <WalletConnect />
-          )}
-          <button
-            onClick={() => {
-              logout();
-              navigate("/login");
-            }}
-          >
-            Log out
-          </button>
-        </>
-      ) : (
-        <>
-          <Link to="/login">Log in</Link>
-          <Link to="/register">Register</Link>
-        </>
-      )}
-    </nav>
+    <header className="site-header">
+      <nav>
+        <Link to="/products" className="brand">
+          <img src="/favicon.svg" alt="" className="brand-logo" />
+          <span className="brand-name">BoltMart</span>
+        </Link>
+        <NavLink to="/products">Products</NavLink>
+        {user?.role === "CUSTOMER" && <NavLink to="/orders">My orders</NavLink>}
+        {user?.role === "SELLER" && <NavLink to="/seller">Dashboard</NavLink>}
+        <span className="spacer" />
+        {user ? (
+          <>
+            <span className="user-chip" title={user.email}>
+              <span className="user-email">{user.email}</span>
+              <span className="role-tag">{user.role.toLowerCase()}</span>
+            </span>
+            {!user.walletAddress && <WalletConnect />}
+            <button
+              className="secondary"
+              onClick={() => {
+                logout();
+                navigate("/login");
+              }}
+            >
+              Log out
+            </button>
+          </>
+        ) : (
+          <>
+            <NavLink to="/login">Log in</NavLink>
+            <Link to="/register" className="button-link">
+              Register
+            </Link>
+          </>
+        )}
+      </nav>
+    </header>
   );
 }
 

@@ -50,7 +50,7 @@ export default function OrdersPage() {
       <h1>My orders</h1>
       {error && <p className="error">{error}</p>}
       {orders.length === 0 ? (
-        <p>You haven't bought anything yet.</p>
+        <p className="muted">You haven't bought anything yet.</p>
       ) : (
         <table>
           <thead>
@@ -70,7 +70,9 @@ export default function OrdersPage() {
                 <td>{o.product?.name}</td>
                 <td>{o.quantity}</td>
                 <td>{weiToEth(o.totalPriceWei)} ETH</td>
-                <td>{o.status}</td>
+                <td>
+                  <span className={`badge badge-${o.status.toLowerCase()}`}>{o.status}</span>
+                </td>
                 <td>
                   {o.status === "ESCROWED" && (
                     <button onClick={() => handleConfirm(o.id)}>Confirm delivery</button>
