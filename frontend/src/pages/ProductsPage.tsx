@@ -47,6 +47,7 @@ export default function ProductsPage() {
       <div className="grid">
         {products.map((p) => (
           <div className="card" key={p.id}>
+            {p.imageUrl && <img src={p.imageUrl} alt={p.name} className="product-image" />}
             <h3>{p.name}</h3>
             <p>{p.description}</p>
             <p>

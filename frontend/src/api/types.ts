@@ -12,6 +12,7 @@ export interface Product {
   sellerId: string;
   name: string;
   description: string;
+  imageUrl: string | null;
   priceWei: string;
   stockQty: number;
   createdAt: string;

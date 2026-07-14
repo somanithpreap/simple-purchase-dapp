@@ -39,6 +39,7 @@ model Product {
   sellerId    String
   name        String
   description String
+  imageUrl    String?
   priceWei    BigInt
   stockQty    Int
   createdAt   DateTime @default(now())

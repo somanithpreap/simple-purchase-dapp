@@ -3,6 +3,7 @@ import jwt from "jsonwebtoken";
 import { prisma } from "../../db/prismaClient.js";
 import { env } from "../../config/env.js";
 import { generateWallet, fundNewWallet } from "../../blockchain/wallet.js";
+import { getProvider } from "../../blockchain/contract.js";
 import { HttpError } from "../../utils/httpError.js";
 import type { RegisterInput, LoginInput } from "./schemas.js";
 import type { Role } from "../../generated/prisma/enums.js";
@@ -40,6 +41,12 @@ export async function register(input: RegisterInput) {
   await fundNewWallet(wallet.address);
 
   return { user, token: issueToken(user.id, user.role) };
+}
+
+export async function getWalletBalance(userId: string) {
+  const user = await prisma.user.findUniqueOrThrow({ where: { id: userId } });
+  const balanceWei = await getProvider().getBalance(user.walletAddress);
+  return { walletAddress: user.walletAddress, balanceWei: balanceWei.toString() };
 }
 
 export async function login(input: LoginInput) {

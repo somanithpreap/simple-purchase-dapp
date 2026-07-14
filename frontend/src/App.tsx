@@ -1,6 +1,8 @@
 import { Navigate, Route, Routes, Link, useNavigate } from "react-router-dom";
-import type { ReactNode } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { useAuth } from "./context/AuthContext";
+import { getBalance } from "./api/client";
+import { weiToEth } from "./utils/format";
 import LoginPage from "./pages/LoginPage";
 import RegisterPage from "./pages/RegisterPage";
 import ProductsPage from "./pages/ProductsPage";
@@ -14,8 +16,24 @@ function RequireAuth({ children }: { children: ReactNode }) {
 }
 
 function NavBar() {
-  const { user, logout } = useAuth();
+  const { user, token, logout } = useAuth();
   const navigate = useNavigate();
+  const [balanceWei, setBalanceWei] = useState<string | null>(null);
+
+  const refreshBalance = useCallback(() => {
+    if (!token) return;
+    getBalance(token)
+      .then((res) => setBalanceWei(res.balanceWei))
+      .catch(() => setBalanceWei(null));
+  }, [token]);
+
+  useEffect(() => {
+    if (!token) {
+      setBalanceWei(null);
+      return;
+    }
+    refreshBalance();
+  }, [token, refreshBalance]);
 
   return (
     <nav>
@@ -28,6 +46,14 @@ function NavBar() {
           <span>
             {user.email} ({user.role})
           </span>
+          {balanceWei !== null && (
+            <span>
+              {weiToEth(balanceWei)} ETH{" "}
+              <button onClick={refreshBalance} title="Refresh balance">
+                ⟳
+              </button>
+            </span>
+          )}
           <button
             onClick={() => {
               logout();

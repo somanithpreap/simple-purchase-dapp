@@ -50,7 +50,7 @@ export function listProducts() {
 
 export function createProduct(
   token: string,
-  input: { name: string; description: string; priceWei: string; stockQty: number },
+  input: { name: string; description: string; imageUrl?: string; priceWei: string; stockQty: number },
 ) {
   return request<Product>("/products", { method: "POST", body: JSON.stringify(input) }, token);
 }
@@ -81,4 +81,8 @@ export function listMyOrders(token: string) {
 
 export function listSellerOrders(token: string) {
   return request<Order[]>("/orders/seller", {}, token);
+}
+
+export function getBalance(token: string) {
+  return request<{ walletAddress: string; balanceWei: string }>("/auth/me/balance", {}, token);
 }

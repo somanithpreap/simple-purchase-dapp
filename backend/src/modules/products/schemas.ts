@@ -3,6 +3,7 @@ import { z } from "zod";
 export const createProductSchema = z.object({
   name: z.string().min(1),
   description: z.string().min(1),
+  imageUrl: z.string().url().optional(),
   priceWei: z.coerce.bigint().positive(),
   stockQty: z.coerce.number().int().nonnegative(),
 });
@@ -14,6 +15,7 @@ export const updateStockSchema = z.object({
 export const updateProductSchema = z.object({
   name: z.string().min(1).optional(),
   description: z.string().min(1).optional(),
+  imageUrl: z.string().url().optional(),
   priceWei: z.coerce.bigint().positive().optional(),
 });
 
