@@ -26,9 +26,7 @@ jobs:
           cat > .env <<EOF
           POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}
           JWT_SECRET=${{ secrets.JWT_SECRET }}
-          ENCRYPTION_KEY=${{ secrets.ENCRYPTION_KEY }}
-          FAUCET_PRIVATE_KEY=${{ secrets.FAUCET_PRIVATE_KEY }}
-          FAUCET_AMOUNT_ETH=${{ secrets.FAUCET_AMOUNT_ETH }}
+          COMPOSE_PROFILES=local-chain
           EOF
 
       - name: Deploy

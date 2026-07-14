@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { useAuth } from "./context/AuthContext";
 import { getBalance } from "./api/client";
 import { weiToEth } from "./utils/format";
+import WalletConnect from "./components/WalletConnect";
 import LoginPage from "./pages/LoginPage";
 import RegisterPage from "./pages/RegisterPage";
 import ProductsPage from "./pages/ProductsPage";
@@ -21,19 +22,19 @@ function NavBar() {
   const [balanceWei, setBalanceWei] = useState<string | null>(null);
 
   const refreshBalance = useCallback(() => {
-    if (!token) return;
+    if (!token || !user?.walletAddress) return;
     getBalance(token)
       .then((res) => setBalanceWei(res.balanceWei))
       .catch(() => setBalanceWei(null));
-  }, [token]);
+  }, [token, user?.walletAddress]);
 
   useEffect(() => {
-    if (!token) {
+    if (!token || !user?.walletAddress) {
       setBalanceWei(null);
       return;
     }
     refreshBalance();
-  }, [token, refreshBalance]);
+  }, [token, user?.walletAddress, refreshBalance]);
 
   return (
     <nav>
@@ -46,13 +47,17 @@ function NavBar() {
           <span>
             {user.email} ({user.role})
           </span>
-          {balanceWei !== null && (
-            <span>
-              {weiToEth(balanceWei)} ETH{" "}
-              <button onClick={refreshBalance} title="Refresh balance">
-                ⟳
-              </button>
-            </span>
+          {user.walletAddress ? (
+            balanceWei !== null && (
+              <span>
+                {weiToEth(balanceWei)} ETH{" "}
+                <button onClick={refreshBalance} title="Refresh balance">
+                  ⟳
+                </button>
+              </span>
+            )
+          ) : (
+            <WalletConnect />
           )}
           <button
             onClick={() => {

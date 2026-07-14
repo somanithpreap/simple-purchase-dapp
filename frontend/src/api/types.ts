@@ -4,7 +4,7 @@ export interface User {
   id: string;
   email: string;
   role: Role;
-  walletAddress: string;
+  walletAddress: string | null;
 }
 
 export interface Product {
@@ -35,5 +35,11 @@ export interface Order {
   createdAt: string;
   updatedAt: string;
   product?: Product;
-  buyer?: { id: string; email: string; walletAddress: string };
+  buyer?: { id: string; email: string; walletAddress: string | null };
+}
+
+/** Response for a freshly created (PENDING) order -- includes what the
+ * frontend needs to build the on-chain purchase() tx via MetaMask. */
+export interface PendingOrder extends Order {
+  sellerWalletAddress: string;
 }

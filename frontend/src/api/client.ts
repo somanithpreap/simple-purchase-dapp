@@ -1,4 +1,4 @@
-import type { User, Product, Order, Role } from "./types";
+import type { User, Product, Order, PendingOrder, Role } from "./types";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "/api/v1";
 
@@ -64,15 +64,23 @@ export function updateStock(token: string, productId: string, stockQty: number) 
 }
 
 export function purchaseProduct(token: string, productId: string, quantity: number) {
-  return request<Order>(
+  return request<PendingOrder>(
     "/orders",
     { method: "POST", body: JSON.stringify({ productId, quantity }) },
     token,
   );
 }
 
-export function confirmDelivery(token: string, orderId: number) {
-  return request<Order>(`/orders/${orderId}/confirm-delivery`, { method: "POST" }, token);
+export function submitPurchaseTx(token: string, orderId: number, txHash: string) {
+  return request<Order>(`/orders/${orderId}/submit-tx`, { method: "POST", body: JSON.stringify({ txHash }) }, token);
+}
+
+export function submitConfirmTx(token: string, orderId: number, txHash: string) {
+  return request<Order>(
+    `/orders/${orderId}/submit-confirm-tx`,
+    { method: "POST", body: JSON.stringify({ txHash }) },
+    token,
+  );
 }
 
 export function listMyOrders(token: string) {
@@ -85,4 +93,20 @@ export function listSellerOrders(token: string) {
 
 export function getBalance(token: string) {
   return request<{ walletAddress: string; balanceWei: string }>("/auth/me/balance", {}, token);
+}
+
+export function getContractInfo() {
+  return request<{ address: string; chainId: number }>("/contract-info");
+}
+
+export function getWalletNonce(token: string) {
+  return request<{ nonce: string; message: string }>("/wallet/nonce", { method: "POST" }, token);
+}
+
+export function connectWallet(token: string, address: string, signature: string) {
+  return request<{ walletAddress: string }>(
+    "/wallet/connect",
+    { method: "POST", body: JSON.stringify({ address, signature }) },
+    token,
+  );
 }

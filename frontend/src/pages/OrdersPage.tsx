@@ -1,8 +1,14 @@
 import { useEffect, useState } from "react";
-import { confirmDelivery, listMyOrders } from "../api/client";
+import { listMyOrders, submitConfirmTx } from "../api/client";
 import { useAuth } from "../context/AuthContext";
 import type { Order } from "../api/types";
 import { weiToEth } from "../utils/format";
+import { ensureNetwork, getSigner } from "../web3/wallet";
+import { getContractInfoCached, getMarketplaceContract } from "../web3/contract";
+
+function isUserRejection(err: unknown): boolean {
+  return typeof err === "object" && err !== null && "code" in err && (err as { code: unknown }).code === "ACTION_REJECTED";
+}
 
 export default function OrdersPage() {
   const { token } = useAuth();
@@ -23,10 +29,19 @@ export default function OrdersPage() {
     if (!token) return;
     setError(null);
     try {
-      await confirmDelivery(token, orderId);
+      const { chainId } = await getContractInfoCached();
+      await ensureNetwork(chainId);
+      const signer = await getSigner();
+      const contract = await getMarketplaceContract(signer);
+      const tx = await contract.confirmDelivery!(orderId);
+      await submitConfirmTx(token, orderId, tx.hash);
       await refresh();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to confirm delivery");
+      if (isUserRejection(err)) {
+        setError("Transaction rejected in wallet.");
+      } else {
+        setError(err instanceof Error ? err.message : "Failed to confirm delivery");
+      }
     }
   }
 

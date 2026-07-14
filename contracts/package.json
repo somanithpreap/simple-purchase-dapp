@@ -7,7 +7,8 @@
     "compile": "hardhat compile",
     "test": "hardhat test",
     "node": "hardhat node",
-    "deploy:localhost": "hardhat ignition deploy --network localhost ignition/modules/Marketplace.ts"
+    "deploy:localhost": "hardhat ignition deploy --network localhost ignition/modules/Marketplace.ts",
+    "deploy:sepolia": "hardhat ignition deploy --network sepolia ignition/modules/Marketplace.ts"
   },
   "devDependencies": {
     "@nomicfoundation/hardhat-toolbox-mocha-ethers": "^3.0.7",

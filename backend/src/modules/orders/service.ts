@@ -1,7 +1,6 @@
 import { prisma } from "../../db/prismaClient.js";
 import { HttpError } from "../../utils/httpError.js";
-import { connectSigner } from "../../blockchain/wallet.js";
-import { getContract } from "../../blockchain/contract.js";
+import { verifyContractEvent, TxVerificationError } from "../../blockchain/verifyTx.js";
 import type { CreateOrderInput } from "./schemas.js";
 
 export async function purchase(buyerId: string, input: CreateOrderInput) {
@@ -14,46 +13,92 @@ export async function purchase(buyerId: string, input: CreateOrderInput) {
   }
 
   const buyer = await prisma.user.findUniqueOrThrow({ where: { id: buyerId } });
+  if (!buyer.walletAddress) {
+    throw new HttpError("Connect a wallet before purchasing", 400);
+  }
   const seller = await prisma.user.findUniqueOrThrow({ where: { id: product.sellerId } });
+  if (!seller.walletAddress) {
+    throw new HttpError("This seller has no wallet connected yet", 409);
+  }
   const totalPriceWei = product.priceWei * BigInt(input.quantity);
 
-  const order = await prisma.order.create({
-    data: {
-      buyerId,
-      sellerId: product.sellerId,
-      productId: product.id,
-      quantity: input.quantity,
-      totalPriceWei,
-      status: "PENDING",
-    },
-  });
+  // Stock is reserved now (not at confirmation) so two buyers can't both
+  // "win" the last unit while their transactions are in flight; restored if
+  // the buyer never submits a valid on-chain tx (see submitPurchaseTx).
+  const [order] = await prisma.$transaction([
+    prisma.order.create({
+      data: {
+        buyerId,
+        sellerId: product.sellerId,
+        productId: product.id,
+        quantity: input.quantity,
+        totalPriceWei,
+        status: "PENDING",
+      },
+    }),
+    prisma.product.update({
+      where: { id: product.id },
+      data: { stockQty: { decrement: input.quantity } },
+    }),
+  ]);
 
-  try {
-    const signer = connectSigner(buyer.encryptedPrivateKey);
-    const contract = await getContract(signer);
-    const tx = await contract.purchase!(order.id, seller.walletAddress, totalPriceWei, {
-      value: totalPriceWei,
-    });
-    await tx.wait();
-
-    const [updatedOrder] = await prisma.$transaction([
-      prisma.order.update({
-        where: { id: order.id },
-        data: { status: "ESCROWED", purchaseTxHash: tx.hash },
-      }),
-      prisma.product.update({
-        where: { id: product.id },
-        data: { stockQty: { decrement: input.quantity } },
-      }),
-    ]);
-    return updatedOrder;
-  } catch (err) {
-    await prisma.order.update({ where: { id: order.id }, data: { status: "FAILED" } });
-    throw new HttpError(`Purchase failed: ${(err as Error).message}`, 502);
-  }
+  return { order, sellerWalletAddress: seller.walletAddress };
 }
 
-export async function confirmDelivery(orderId: number, buyerId: string) {
+/**
+ * Phase 2 of purchase: the buyer signed and submitted `purchase()` via
+ * MetaMask themselves. The backend never trusts the tx hash it's handed --
+ * it independently fetches the receipt and decodes the contract's own
+ * OrderCreated event to confirm the order was actually escrowed as expected.
+ */
+export async function submitPurchaseTx(orderId: number, buyerId: string, txHash: string) {
+  const order = await prisma.order.findUnique({ where: { id: orderId } });
+  if (!order) {
+    throw new HttpError("Order not found", 404);
+  }
+  if (order.buyerId !== buyerId) {
+    throw new HttpError("Not your order", 403);
+  }
+  if (order.status !== "PENDING") {
+    throw new HttpError(`Order is not pending (status: ${order.status})`, 409);
+  }
+
+  const buyer = await prisma.user.findUniqueOrThrow({ where: { id: order.buyerId } });
+  const seller = await prisma.user.findUniqueOrThrow({ where: { id: order.sellerId } });
+
+  try {
+    await verifyContractEvent(txHash, "OrderCreated", {
+      orderId: BigInt(order.id),
+      buyer: buyer.walletAddress,
+      seller: seller.walletAddress,
+      amount: order.totalPriceWei,
+    });
+  } catch (err) {
+    if (err instanceof TxVerificationError) {
+      await prisma.$transaction([
+        prisma.order.update({ where: { id: order.id }, data: { status: "FAILED" } }),
+        prisma.product.update({
+          where: { id: order.productId },
+          data: { stockQty: { increment: order.quantity } },
+        }),
+      ]);
+      throw new HttpError(`Purchase verification failed: ${err.message}`, 502);
+    }
+    throw err;
+  }
+
+  return prisma.order.update({
+    where: { id: order.id },
+    data: { status: "ESCROWED", purchaseTxHash: txHash },
+  });
+}
+
+/**
+ * Phase 2 of confirm-delivery: same pattern as submitPurchaseTx, verifying
+ * the buyer's client-submitted confirmDelivery() tx against the contract's
+ * DeliveryConfirmed event before releasing the order from escrow.
+ */
+export async function submitConfirmTx(orderId: number, buyerId: string, txHash: string) {
   const order = await prisma.order.findUnique({ where: { id: orderId } });
   if (!order) {
     throw new HttpError("Order not found", 404);
@@ -65,20 +110,27 @@ export async function confirmDelivery(orderId: number, buyerId: string) {
     throw new HttpError(`Order is not escrowed (status: ${order.status})`, 409);
   }
 
-  const buyer = await prisma.user.findUniqueOrThrow({ where: { id: buyerId } });
-  const signer = connectSigner(buyer.encryptedPrivateKey);
-  const contract = await getContract(signer);
+  const buyer = await prisma.user.findUniqueOrThrow({ where: { id: order.buyerId } });
+  const seller = await prisma.user.findUniqueOrThrow({ where: { id: order.sellerId } });
 
   try {
-    const tx = await contract.confirmDelivery!(order.id);
-    await tx.wait();
-    return prisma.order.update({
-      where: { id: order.id },
-      data: { status: "DELIVERED", confirmTxHash: tx.hash },
+    await verifyContractEvent(txHash, "DeliveryConfirmed", {
+      orderId: BigInt(order.id),
+      buyer: buyer.walletAddress,
+      seller: seller.walletAddress,
+      amount: order.totalPriceWei,
     });
   } catch (err) {
-    throw new HttpError(`Confirm delivery failed: ${(err as Error).message}`, 502);
+    if (err instanceof TxVerificationError) {
+      throw new HttpError(`Confirm delivery verification failed: ${err.message}`, 502);
+    }
+    throw err;
   }
+
+  return prisma.order.update({
+    where: { id: order.id },
+    data: { status: "DELIVERED", confirmTxHash: txHash },
+  });
 }
 
 export async function listBuyerOrders(buyerId: string) {

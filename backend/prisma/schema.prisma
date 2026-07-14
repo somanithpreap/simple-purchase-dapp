@@ -21,13 +21,14 @@ enum OrderStatus {
 }
 
 model User {
-  id                  String   @id @default(uuid())
-  email               String   @unique
+  id                  String    @id @default(uuid())
+  email               String    @unique
   passwordHash        String
   role                Role
-  walletAddress       String   @unique
-  encryptedPrivateKey String
-  createdAt           DateTime @default(now())
+  walletAddress       String?   @unique
+  walletNonce         String?
+  walletNonceIssuedAt DateTime?
+  createdAt           DateTime  @default(now())
 
   products      Product[]
   ordersAsBuyer  Order[] @relation("BuyerOrders")

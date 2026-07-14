@@ -8,7 +8,7 @@ safe to commit or script end-to-end.
 
 ## Why the runner lives outside Docker
 
-The CI workflow (`.github/workflows/ci.yml`) drives the app with
+The deploy workflow (`.github/workflows/cd.yml`) drives the app with
 `docker compose`. For that to work, the runner process itself must run
 directly on the host — not inside a container — so it can reach the host's
 Docker daemon and invoke `docker compose` the same way a developer would.
@@ -86,11 +86,13 @@ to new login sessions).
 
 ## 6. Configure CD secrets
 
-The `deploy` job in `.github/workflows/ci.yml` runs on this same server
-after the `test` job passes (only on pushes to `main`). It writes a `.env`
-file from GitHub Actions secrets and runs `docker compose up -d --build`
-in place — no registry push, no separate deploy target, since the runner
-and the app live on the same box.
+The `deploy` job in `.github/workflows/cd.yml` runs on this server on every
+push to `main`. It writes a `.env` file from GitHub Actions secrets and runs
+`docker compose up -d --build` in place — no registry push, no separate
+deploy target, since the runner and the app live on the same box. It also
+writes `COMPOSE_PROFILES=local-chain`, so this deploys against the local
+Hardhat-in-Docker chain, not Sepolia (see `.env.example` for how to point a
+deployment at Sepolia instead).
 
 Create a GitHub **Environment** named `production` (**Settings → Environments
 → New environment**) and add these as *environment secrets* (or as
@@ -101,9 +103,6 @@ remove the `environment: production` line from the `deploy` job):
 | -------------------- | ---------------------------------------------------------------------|
 | `POSTGRES_PASSWORD`  | Any strong password (defaults to `dapp` if unset — change it)        |
 | `JWT_SECRET`         | Random string used to sign backend JWTs                              |
-| `ENCRYPTION_KEY`     | 32 bytes as hex (64 chars) — see `.env.example` for how to generate  |
-| `FAUCET_PRIVATE_KEY` | Leave as Hardhat's default account key unless you know you want otherwise — see `SECURITY.md` |
-| `FAUCET_AMOUNT_ETH`  | e.g. `1`                                                              |
 
 `VITE_API_BASE_URL` is not needed: nginx (`frontend/nginx.conf`) reverse-proxies
 `/api/*` to the backend container, so the frontend bundle calls a same-origin

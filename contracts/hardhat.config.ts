@@ -36,5 +36,14 @@ export default defineConfig({
       chainType: "l1",
       url: configVariable("HARDHAT_RPC_URL"),
     },
+    // Real testnet -- unlike the local/docker networks above, there are no
+    // auto-unlocked accounts, so a funded deployer key is required. Deployed
+    // manually (`npm run deploy:sepolia`), not via a docker-compose service.
+    sepolia: {
+      type: "http",
+      chainType: "l1",
+      url: configVariable("SEPOLIA_RPC_URL"),
+      accounts: [configVariable("SEPOLIA_DEPLOYER_PRIVATE_KEY")],
+    },
   },
 });

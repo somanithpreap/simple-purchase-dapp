@@ -18,9 +18,14 @@ services:
       retries: 20
     networks: [app-net]
 
+  # Local Hardhat chain + one-shot deploy, used only for the local dev/CI
+  # flow. Not started unless the "local-chain" profile is active (see
+  # COMPOSE_PROFILES in .env.example) -- a Sepolia deployment has no local
+  # chain and points RPC_URL/CONTRACT_ADDRESS at the real testnet instead.
   hardhat-node:
     build: ./contracts
     image: simple-purchase-dapp-contracts:local
+    profiles: ["local-chain"]
     ports:
       - "8545:8545"
     healthcheck:
@@ -40,6 +45,7 @@ services:
   contract-deploy:
     build: ./contracts
     image: simple-purchase-dapp-contracts:local
+    profiles: ["local-chain"]
     command: ["npx", "hardhat", "ignition", "deploy", "--network", "docker", "ignition/modules/Marketplace.ts"]
     environment:
       HARDHAT_RPC_URL: http://hardhat-node:8545
@@ -57,16 +63,19 @@ services:
       PORT: 4000
       JWT_SECRET: ${JWT_SECRET:-dev-only-change-me}
       JWT_EXPIRES_IN: 1h
-      ENCRYPTION_KEY: ${ENCRYPTION_KEY:-42a8095a12b1de3c385e85291a62b819b3ac8982324d46bdb212d5b0ba3d74e4}
-      HARDHAT_RPC_URL: http://hardhat-node:8545
+      # Local Hardhat-in-Docker default. For a Sepolia deployment, override
+      # RPC_URL and set CONTRACT_ADDRESS (the one-time `deploy:sepolia`
+      # output) instead -- CONTRACT_ADDRESS_FILE is only used as a fallback
+      # when CONTRACT_ADDRESS is unset.
+      RPC_URL: ${RPC_URL:-http://hardhat-node:8545}
+      CONTRACT_ADDRESS: ${CONTRACT_ADDRESS:-}
       CONTRACT_ADDRESS_FILE: /deployments/chain-31337/deployed_addresses.json
-      FAUCET_PRIVATE_KEY: ${FAUCET_PRIVATE_KEY:-0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80}
-      FAUCET_AMOUNT_ETH: ${FAUCET_AMOUNT_ETH:-1}
     depends_on:
       postgres:
         condition: service_healthy
       contract-deploy:
         condition: service_completed_successfully
+        required: false
     volumes:
       - contract-artifacts:/deployments:ro
     ports:
