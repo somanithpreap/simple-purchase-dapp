@@ -4,6 +4,7 @@ import {
   deleteProduct,
   listProducts,
   listSellerOrders,
+  updateProduct,
   updateStock,
 } from "../api/client";
 import { useAuth } from "../context/AuthContext";
@@ -27,6 +28,13 @@ export default function SellerDashboardPage() {
   const [savingStockId, setSavingStockId] = useState<string | null>(null);
   const [removingId, setRemovingId] = useState<string | null>(null);
   const [productError, setProductError] = useState<string | null>(null);
+  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [editName, setEditName] = useState("");
+  const [editDescription, setEditDescription] = useState("");
+  const [editImageUrl, setEditImageUrl] = useState("");
+  const [editPriceEth, setEditPriceEth] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [editError, setEditError] = useState<string | null>(null);
 
   async function refresh() {
     if (!token || !user) return;
@@ -90,6 +98,36 @@ export default function SellerDashboardPage() {
       setProductError(err instanceof Error ? err.message : "Failed to update stock");
     } finally {
       setSavingStockId(null);
+    }
+  }
+
+  function openEditModal(product: Product) {
+    setEditingProduct(product);
+    setEditName(product.name);
+    setEditDescription(product.description);
+    setEditImageUrl(product.imageUrl ?? "");
+    setEditPriceEth(weiToEth(product.priceWei));
+    setEditError(null);
+  }
+
+  async function handleEditSubmit(e: FormEvent) {
+    e.preventDefault();
+    if (!token || !editingProduct) return;
+    setEditError(null);
+    setSaving(true);
+    try {
+      await updateProduct(token, editingProduct.id, {
+        name: editName,
+        description: editDescription,
+        imageUrl: editImageUrl || undefined,
+        priceWei: ethToWei(editPriceEth),
+      });
+      setEditingProduct(null);
+      await refresh();
+    } catch (err) {
+      setEditError(err instanceof Error ? err.message : "Failed to update product");
+    } finally {
+      setSaving(false);
     }
   }
 
@@ -169,6 +207,54 @@ export default function SellerDashboardPage() {
         </Modal>
       )}
 
+      {editingProduct && (
+        <Modal title={`Edit "${editingProduct.name}"`} onClose={() => setEditingProduct(null)}>
+          <form onSubmit={handleEditSubmit}>
+            <label>
+              Name
+              <input value={editName} onChange={(e) => setEditName(e.target.value)} required />
+            </label>
+            <label>
+              Description
+              <input
+                value={editDescription}
+                onChange={(e) => setEditDescription(e.target.value)}
+                required
+              />
+            </label>
+            <label>
+              Image URL
+              <input
+                type="url"
+                value={editImageUrl}
+                onChange={(e) => setEditImageUrl(e.target.value)}
+                placeholder="https://example.com/image.jpg"
+              />
+            </label>
+            <label>
+              Price (ETH)
+              <input
+                type="number"
+                step="0.0001"
+                min="0"
+                value={editPriceEth}
+                onChange={(e) => setEditPriceEth(e.target.value)}
+                required
+              />
+            </label>
+            {editError && <p className="error">{editError}</p>}
+            <div className="modal-actions">
+              <button type="button" className="secondary" onClick={() => setEditingProduct(null)}>
+                Cancel
+              </button>
+              <button type="submit" disabled={saving}>
+                {saving ? "Saving..." : "Save changes"}
+              </button>
+            </div>
+          </form>
+        </Modal>
+      )}
+
       <section>
         <h2>Your products</h2>
         {productError && <p className="error">{productError}</p>}
@@ -200,14 +286,19 @@ export default function SellerDashboardPage() {
                     {savingStockId === p.id ? "Saving..." : "Update"}
                   </button>
                 </form>
-                <button
-                  type="button"
-                  className="danger"
-                  onClick={() => handleRemove(p)}
-                  disabled={removingId === p.id}
-                >
-                  {removingId === p.id ? "Removing..." : "Remove"}
-                </button>
+                <div className="card-actions">
+                  <button type="button" className="secondary" onClick={() => openEditModal(p)}>
+                    Edit
+                  </button>
+                  <button
+                    type="button"
+                    className="danger"
+                    onClick={() => handleRemove(p)}
+                    disabled={removingId === p.id}
+                  >
+                    {removingId === p.id ? "Removing..." : "Remove"}
+                  </button>
+                </div>
               </div>
             );
           })}
@@ -234,7 +325,7 @@ export default function SellerDashboardPage() {
               {orders.map((o) => (
                 <tr key={o.id}>
                   <td>#{o.id}</td>
-                  <td>{o.product?.name}</td>
+                  <td>{o.product?.name ?? o.productName}</td>
                   <td>{o.quantity}</td>
                   <td>{weiToEth(o.totalPriceWei)} ETH</td>
                   <td>

@@ -14,12 +14,13 @@ export function serializeProduct(product: Product) {
   };
 }
 
-export function serializeOrder(order: Order & { product?: Product; buyer?: User }) {
+export function serializeOrder(order: Order & { product?: Product | null; buyer?: User }) {
   return {
     id: order.id,
     buyerId: order.buyerId,
     sellerId: order.sellerId,
     productId: order.productId,
+    productName: order.productName,
     quantity: order.quantity,
     totalPriceWei: order.totalPriceWei.toString(),
     status: order.status,

@@ -31,6 +31,7 @@ export async function purchase(buyerId: string, input: CreateOrderInput) {
         buyerId,
         sellerId: product.sellerId,
         productId: product.id,
+        productName: product.name,
         quantity: input.quantity,
         totalPriceWei,
         status: "PENDING",
@@ -75,12 +76,18 @@ export async function submitPurchaseTx(orderId: number, buyerId: string, txHash:
     });
   } catch (err) {
     if (err instanceof TxVerificationError) {
+      // A PENDING order's product can't have been deleted (deleteProduct blocks
+      // on active orders), so productId is always still set here.
       await prisma.$transaction([
         prisma.order.update({ where: { id: order.id }, data: { status: "FAILED" } }),
-        prisma.product.update({
-          where: { id: order.productId },
-          data: { stockQty: { increment: order.quantity } },
-        }),
+        ...(order.productId
+          ? [
+              prisma.product.update({
+                where: { id: order.productId },
+                data: { stockQty: { increment: order.quantity } },
+              }),
+            ]
+          : []),
       ]);
       throw new HttpError(`Purchase verification failed: ${err.message}`, 502);
     }

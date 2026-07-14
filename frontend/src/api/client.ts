@@ -55,6 +55,18 @@ export function createProduct(
   return request<Product>("/products", { method: "POST", body: JSON.stringify(input) }, token);
 }
 
+export function updateProduct(
+  token: string,
+  productId: string,
+  input: { name?: string; description?: string; imageUrl?: string; priceWei?: string },
+) {
+  return request<Product>(
+    `/products/${productId}`,
+    { method: "PATCH", body: JSON.stringify(input) },
+    token,
+  );
+}
+
 export function updateStock(token: string, productId: string, stockQty: number) {
   return request<Product>(
     `/products/${productId}/stock`,

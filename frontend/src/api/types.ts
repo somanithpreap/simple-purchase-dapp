@@ -25,7 +25,8 @@ export interface Order {
   id: number;
   buyerId: string;
   sellerId: string;
-  productId: string;
+  productId: string | null;
+  productName: string;
   quantity: number;
   totalPriceWei: string;
   status: OrderStatus;

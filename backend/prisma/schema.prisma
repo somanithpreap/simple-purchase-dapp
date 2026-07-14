@@ -56,7 +56,8 @@ model Order {
   id              Int         @id @default(autoincrement())
   buyerId         String
   sellerId        String
-  productId       String
+  productId       String?
+  productName     String
   quantity        Int
   totalPriceWei   BigInt
   status          OrderStatus @default(PENDING)
@@ -66,9 +67,9 @@ model Order {
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @updatedAt
 
-  buyer   User    @relation("BuyerOrders", fields: [buyerId], references: [id])
-  seller  User    @relation("SellerOrders", fields: [sellerId], references: [id])
-  product Product @relation(fields: [productId], references: [id])
+  buyer   User     @relation("BuyerOrders", fields: [buyerId], references: [id])
+  seller  User     @relation("SellerOrders", fields: [sellerId], references: [id])
+  product Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
 
   @@index([buyerId])
   @@index([sellerId])

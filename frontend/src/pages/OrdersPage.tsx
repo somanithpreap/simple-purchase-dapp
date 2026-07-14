@@ -67,7 +67,7 @@ export default function OrdersPage() {
             {orders.map((o) => (
               <tr key={o.id}>
                 <td>#{o.id}</td>
-                <td>{o.product?.name}</td>
+                <td>{o.product?.name ?? o.productName}</td>
                 <td>{o.quantity}</td>
                 <td>{weiToEth(o.totalPriceWei)} ETH</td>
                 <td>
