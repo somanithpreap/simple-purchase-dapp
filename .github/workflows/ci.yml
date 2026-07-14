@@ -1,0 +1,97 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: self-hosted
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Start Postgres and the local Hardhat node
+        run: docker compose up -d --wait postgres hardhat-node
+
+      - name: Install contracts dependencies
+        working-directory: contracts
+        run: npm ci
+
+      - name: Compile contracts
+        working-directory: contracts
+        run: npm run compile
+
+      - name: Run contract test suite
+        working-directory: contracts
+        run: npm test
+
+      - name: Deploy Marketplace.sol to the running local chain
+        working-directory: contracts
+        run: npm run deploy:localhost
+
+      - name: Install backend dependencies
+        working-directory: backend
+        run: npm ci
+
+      - name: Create backend test database
+        run: docker compose exec -T postgres psql -U dapp -d dapp -c "CREATE DATABASE dapp_test;"
+
+      - name: Apply migrations to the test database
+        working-directory: backend
+        env:
+          DATABASE_URL: postgresql://dapp:dapp@localhost:5433/dapp_test?schema=public
+        run: npx prisma migrate deploy
+
+      - name: Run backend integration tests
+        working-directory: backend
+        run: npm run test:integration
+
+      - name: Bring up the full stack (deployment smoke test)
+        run: docker compose up -d --wait
+
+      - name: Smoke-test the containerized backend
+        run: curl --fail --retry 5 --retry-delay 2 http://localhost:8090/health
+
+      - name: Tear down
+        if: always()
+        run: docker compose down -v
+
+  deploy:
+    needs: test
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: self-hosted
+    environment: production
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Deploys on the same host the runner lives on (see
+      # infra/github-runner/SETUP.md) by writing a real .env file from
+      # repo/environment secrets and re-running docker compose in place --
+      # no registry push, no separate deploy target.
+      - name: Write .env from secrets
+        run: |
+          cat > .env <<EOF
+          POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}
+          JWT_SECRET=${{ secrets.JWT_SECRET }}
+          ENCRYPTION_KEY=${{ secrets.ENCRYPTION_KEY }}
+          FAUCET_PRIVATE_KEY=${{ secrets.FAUCET_PRIVATE_KEY }}
+          FAUCET_AMOUNT_ETH=${{ secrets.FAUCET_AMOUNT_ETH }}
+          EOF
+
+      - name: Deploy
+        run: docker compose up -d --build --remove-orphans
+
+      - name: Smoke-test the deployed backend
+        run: curl --fail --retry 10 --retry-delay 3 http://localhost:8090/health
+
+      - name: Clean up dangling images
+        if: always()
+        run: docker image prune -f

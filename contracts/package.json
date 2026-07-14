@@ -1,0 +1,24 @@
+{
+  "name": "contracts",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "compile": "hardhat compile",
+    "test": "hardhat test",
+    "node": "hardhat node",
+    "deploy:localhost": "hardhat ignition deploy --network localhost ignition/modules/Marketplace.ts"
+  },
+  "devDependencies": {
+    "@nomicfoundation/hardhat-toolbox-mocha-ethers": "^3.0.7",
+    "@openzeppelin/contracts": "^5.1.0",
+    "@types/chai": "^5.2.3",
+    "@types/mocha": ">=10.0.10",
+    "@types/node": "^20.14.0",
+    "chai": "^6.2.2",
+    "ethers": "^6.17.0",
+    "hardhat": "^3.9.1",
+    "mocha": "^11.0.0",
+    "typescript": "^5.6.0"
+  }
+}

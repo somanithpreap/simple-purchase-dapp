@@ -1,0 +1,74 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  SELLER
+  CUSTOMER
+}
+
+enum OrderStatus {
+  PENDING
+  ESCROWED
+  DELIVERED
+  CANCELLED
+  FAILED
+}
+
+model User {
+  id                  String   @id @default(uuid())
+  email               String   @unique
+  passwordHash        String
+  role                Role
+  walletAddress       String   @unique
+  encryptedPrivateKey String
+  createdAt           DateTime @default(now())
+
+  products      Product[]
+  ordersAsBuyer  Order[] @relation("BuyerOrders")
+  ordersAsSeller Order[] @relation("SellerOrders")
+}
+
+model Product {
+  id          String   @id @default(uuid())
+  sellerId    String
+  name        String
+  description String
+  priceWei    BigInt
+  stockQty    Int
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  seller User    @relation(fields: [sellerId], references: [id])
+  orders Order[]
+
+  @@index([sellerId])
+}
+
+model Order {
+  id              Int         @id @default(autoincrement())
+  buyerId         String
+  sellerId        String
+  productId       String
+  quantity        Int
+  totalPriceWei   BigInt
+  status          OrderStatus @default(PENDING)
+  purchaseTxHash  String?
+  confirmTxHash   String?
+  cancelTxHash    String?
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  buyer   User    @relation("BuyerOrders", fields: [buyerId], references: [id])
+  seller  User    @relation("SellerOrders", fields: [sellerId], references: [id])
+  product Product @relation(fields: [productId], references: [id])
+
+  @@index([buyerId])
+  @@index([sellerId])
+  @@index([status])
+}

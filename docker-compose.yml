@@ -1,0 +1,108 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: dapp
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-dapp}
+      POSTGRES_DB: dapp
+    ports:
+      # Published so CI (and local devs outside Docker) can create a
+      # dedicated test database and run integration tests directly.
+      - "5433:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dapp -d dapp"]
+      interval: 2s
+      timeout: 3s
+      retries: 20
+    networks: [app-net]
+
+  hardhat-node:
+    build: ./contracts
+    image: simple-purchase-dapp-contracts:local
+    ports:
+      - "8545:8545"
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "node -e \"require('net').connect(8545,'127.0.0.1').on('connect',()=>process.exit(0)).on('error',()=>process.exit(1))\"",
+        ]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+    networks: [app-net]
+
+  # One-shot: deploys Marketplace.sol to hardhat-node and writes the address
+  # to a shared volume. Re-runs (and re-deploys) on every `docker compose up`
+  # since hardhat-node's chain state doesn't persist across container restarts.
+  contract-deploy:
+    build: ./contracts
+    image: simple-purchase-dapp-contracts:local
+    command: ["npx", "hardhat", "ignition", "deploy", "--network", "docker", "ignition/modules/Marketplace.ts"]
+    environment:
+      HARDHAT_RPC_URL: http://hardhat-node:8545
+    depends_on:
+      hardhat-node:
+        condition: service_healthy
+    volumes:
+      - contract-artifacts:/app/ignition/deployments
+    networks: [app-net]
+
+  backend:
+    build: ./backend
+    environment:
+      DATABASE_URL: postgresql://dapp:${POSTGRES_PASSWORD:-dapp}@postgres:5432/dapp?schema=public
+      PORT: 4000
+      JWT_SECRET: ${JWT_SECRET:-dev-only-change-me}
+      JWT_EXPIRES_IN: 1h
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:-42a8095a12b1de3c385e85291a62b819b3ac8982324d46bdb212d5b0ba3d74e4}
+      HARDHAT_RPC_URL: http://hardhat-node:8545
+      CONTRACT_ADDRESS_FILE: /deployments/chain-31337/deployed_addresses.json
+      FAUCET_PRIVATE_KEY: ${FAUCET_PRIVATE_KEY:-0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80}
+      FAUCET_AMOUNT_ETH: ${FAUCET_AMOUNT_ETH:-1}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      contract-deploy:
+        condition: service_completed_successfully
+    volumes:
+      - contract-artifacts:/deployments:ro
+    ports:
+      - "8090:4000"
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "node -e \"require('http').get('http://localhost:4000/health',r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))\"",
+        ]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+    networks: [app-net]
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        # Vite inlines env vars at build time. Defaults to a same-origin
+        # relative path, which nginx (see frontend/nginx.conf) reverse-proxies
+        # to the backend container -- so this normally doesn't need to be
+        # set. Only override it if the frontend and backend are served from
+        # different origins.
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-/api/v1}
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "5173:80"
+    networks: [app-net]
+
+volumes:
+  pgdata:
+  contract-artifacts:
+
+networks:
+  app-net:
+    driver: bridge
