@@ -20,13 +20,17 @@ jobs:
       # Deploys on the same host the runner lives on (see
       # infra/github-runner/SETUP.md) by writing a real .env file from
       # repo/environment secrets and re-running docker compose in place --
-      # no registry push, no separate deploy target.
+      # no registry push, no separate deploy target. Points at Sepolia, not
+      # the local Hardhat chain -- RPC_URL/CONTRACT_ADDRESS come from an RPC
+      # provider and a one-time `npm run deploy:sepolia` (see
+      # DEPLOYMENT.md), not from COMPOSE_PROFILES=local-chain.
       - name: Write .env from secrets
         run: |
           cat > .env <<EOF
           POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}
           JWT_SECRET=${{ secrets.JWT_SECRET }}
-          COMPOSE_PROFILES=local-chain
+          RPC_URL=${{ secrets.RPC_URL }}
+          CONTRACT_ADDRESS=${{ secrets.CONTRACT_ADDRESS }}
           EOF
 
       - name: Deploy

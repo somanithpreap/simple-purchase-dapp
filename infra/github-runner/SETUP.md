@@ -89,10 +89,11 @@ to new login sessions).
 The `deploy` job in `.github/workflows/cd.yml` runs on this server on every
 push to `main`. It writes a `.env` file from GitHub Actions secrets and runs
 `docker compose up -d --build` in place — no registry push, no separate
-deploy target, since the runner and the app live on the same box. It also
-writes `COMPOSE_PROFILES=local-chain`, so this deploys against the local
-Hardhat-in-Docker chain, not Sepolia (see `.env.example` for how to point a
-deployment at Sepolia instead).
+deploy target, since the runner and the app live on the same box. It writes
+`RPC_URL`/`CONTRACT_ADDRESS`, not `COMPOSE_PROFILES=local-chain`, so
+production deploys against **Sepolia**, not an ephemeral local Hardhat
+chain — see `DEPLOYMENT.md` for deploying `Marketplace.sol` to Sepolia
+first (you need a `CONTRACT_ADDRESS` before this job can succeed).
 
 Create a GitHub **Environment** named `production` (**Settings → Environments
 → New environment**) and add these as *environment secrets* (or as
@@ -103,6 +104,8 @@ remove the `environment: production` line from the `deploy` job):
 | -------------------- | ---------------------------------------------------------------------|
 | `POSTGRES_PASSWORD`  | Any strong password (defaults to `dapp` if unset — change it)        |
 | `JWT_SECRET`         | Random string used to sign backend JWTs                              |
+| `RPC_URL`            | Your Sepolia RPC endpoint (Alchemy/Infura, etc. — same one used to deploy) |
+| `CONTRACT_ADDRESS`   | The address `npm run deploy:sepolia` printed (see `DEPLOYMENT.md`)   |
 
 `VITE_API_BASE_URL` is not needed: nginx (`frontend/nginx.conf`) reverse-proxies
 `/api/*` to the backend container, so the frontend bundle calls a same-origin
@@ -114,10 +117,10 @@ reviewers) in front of deploys if you want a manual gate before `main`
 goes live.
 
 If the server should be reachable from outside (not just `localhost`),
-open the relevant inbound ports in your firewall/security group: `5173`
+open the relevant inbound port in your firewall/security group: `5173`
 (frontend — now also serves the backend API via nginx reverse proxy, so
-`8090` no longer needs to be exposed publicly), and optionally `8545` (Hardhat RPC, only
-if you want external tools to query the chain directly).
+`8090` no longer needs to be exposed publicly). There's no local chain in
+this deployment, so no `8545` to expose.
 
 ## Updating or removing the runner
 
