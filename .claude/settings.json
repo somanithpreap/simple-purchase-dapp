@@ -46,7 +46,24 @@
       "Bash(npx --yes js-yaml .github/workflows/ci.yml)",
       "Bash(curl -s -o /dev/null -w \"frontend / -> %{http_code}\\\\n\" http://localhost:5173/)",
       "Bash(curl -s -o /dev/null -w \"frontend /api/v1/products -> %{http_code}\\\\n\" http://localhost:5173/api/v1/products)",
-      "Bash(curl -s http://localhost:5173/api/v1/products)"
+      "Bash(curl -s http://localhost:5173/api/v1/products)",
+      "Bash(npx tsc *)",
+      "Bash(node -e \"console.log\\(require\\('./package.json'\\).scripts\\)\")",
+      "Bash(git commit -m ' *)",
+      "Bash(git checkout *)",
+      "Bash(COMPOSE_PROFILES=local-chain docker compose config --quiet)",
+      "Bash(COMPOSE_PROFILES=local-chain docker compose config --services)",
+      "Bash(curl -s http://localhost:8090/health)",
+      "Bash(curl -s http://localhost:8090/api/v1/contract-info)",
+      "Bash(mkdir -p \"/c/Users/ASUS/AppData/Local/Temp/claude/d--projects-simple-purchase-dapp/a72abfb8-8e27-4baf-8514-9dfc8fdb3ef7/scratchpad\")",
+      "Bash(cp /tmp/smoke.mjs \"d:/projects/simple-purchase-dapp/backend/smoke.mjs\")",
+      "Bash(node smoke.mjs)",
+      "Bash(rm \"d:/projects/simple-purchase-dapp/backend/smoke.mjs\" /tmp/smoke.mjs)",
+      "Bash(node smoke2.mjs)",
+      "Bash(node -e ' *)"
+    ],
+    "additionalDirectories": [
+      "\\tmp"
     ]
   }
 }

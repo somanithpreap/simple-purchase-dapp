@@ -10,6 +10,7 @@ export default function SellerDashboardPage() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
+  const [imageUrl, setImageUrl] = useState("");
   const [priceEth, setPriceEth] = useState("");
   const [stockQty, setStockQty] = useState(1);
   const [error, setError] = useState<string | null>(null);
@@ -34,9 +35,16 @@ export default function SellerDashboardPage() {
     if (!token) return;
     setError(null);
     try {
-      await createProduct(token, { name, description, priceWei: ethToWei(priceEth), stockQty });
+      await createProduct(token, {
+        name,
+        description,
+        imageUrl: imageUrl || undefined,
+        priceWei: ethToWei(priceEth),
+        stockQty,
+      });
       setName("");
       setDescription("");
+      setImageUrl("");
       setPriceEth("");
       setStockQty(1);
       await refresh();
@@ -65,6 +73,15 @@ export default function SellerDashboardPage() {
           <label>
             Description
             <input value={description} onChange={(e) => setDescription(e.target.value)} required />
+          </label>
+          <label>
+            Image URL
+            <input
+              type="url"
+              value={imageUrl}
+              onChange={(e) => setImageUrl(e.target.value)}
+              placeholder="https://example.com/image.jpg"
+            />
           </label>
           <label>
             Price (ETH)
@@ -98,6 +115,7 @@ export default function SellerDashboardPage() {
         <div className="grid">
           {products.map((p) => (
             <div className="card" key={p.id}>
+              {p.imageUrl && <img src={p.imageUrl} alt={p.name} className="product-image" />}
               <h3>{p.name}</h3>
               <p>{weiToEth(p.priceWei)} ETH</p>
               <label>

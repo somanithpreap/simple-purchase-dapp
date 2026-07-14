@@ -2,7 +2,7 @@ import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { prisma } from "../../db/prismaClient.js";
 import { env } from "../../config/env.js";
-import { generateWallet, fundNewWallet } from "../../blockchain/wallet.js";
+import { getProvider } from "../../blockchain/contract.js";
 import { HttpError } from "../../utils/httpError.js";
 import type { RegisterInput, LoginInput } from "./schemas.js";
 import type { Role } from "../../generated/prisma/enums.js";
@@ -22,24 +22,25 @@ export async function register(input: RegisterInput) {
   }
 
   const passwordHash = await bcrypt.hash(input.password, SALT_ROUNDS);
-  const wallet = generateWallet();
 
   const user = await prisma.user.create({
     data: {
       email: input.email,
       passwordHash,
       role: input.role,
-      walletAddress: wallet.address,
-      encryptedPrivateKey: wallet.encryptedPrivateKey,
     },
   });
 
-  // Funds the custodial wallet so the user can pay gas for future purchase /
-  // confirm-delivery transactions. Intentionally not swallowed: an unfunded
-  // wallet would only fail later, at purchase time, in a more confusing way.
-  await fundNewWallet(wallet.address);
-
   return { user, token: issueToken(user.id, user.role) };
+}
+
+export async function getWalletBalance(userId: string) {
+  const user = await prisma.user.findUniqueOrThrow({ where: { id: userId } });
+  if (!user.walletAddress) {
+    throw new HttpError("No wallet linked", 409);
+  }
+  const balanceWei = await getProvider().getBalance(user.walletAddress);
+  return { walletAddress: user.walletAddress, balanceWei: balanceWei.toString() };
 }
 
 export async function login(input: LoginInput) {

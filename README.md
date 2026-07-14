@@ -41,50 +41,41 @@ an escrowed amount.
 Requires Docker and Docker Compose.
 
 ```bash
-docker compose up -d --wait
+docker compose --profile local-chain up -d
 ```
 
 This builds and starts, in order: Postgres, the local Hardhat node, a
 one-shot deploy of the `Marketplace` contract, the backend API, and the
-frontend. No manual steps required.
+frontend. No manual steps required. The `local-chain` profile is what
+starts the local Hardhat node/deploy at all — omit it (and set `RPC_URL`/
+`CONTRACT_ADDRESS` instead) to point the stack at a real network like
+Sepolia; see `DEPLOYMENT.md` and `TESTING.md` for that flow.
 
 - Frontend: http://localhost:5173
 - Backend API: http://localhost:8090/api/v1 (health check at `/health`)
 - Hardhat JSON-RPC: http://localhost:8545
 
-Copy `.env.example` to `.env` to override any of the defaults (JWT secret,
-encryption key, faucet account, etc.) — see that file for details.
+Copy `.env.example` to `.env` to override any of the defaults — see that
+file for details.
 
 Tear down with `docker compose down` (add `-v` to also drop the Postgres
 volume and start fresh next time).
 
 ## Running tests
 
-**Contract tests** (Hardhat + mocha, in-process chain, no setup needed):
+See `TESTING.md` for the full local and Sepolia testing guides (connecting
+MetaMask, walking through the app, running the automated suites, and
+troubleshooting). Short version:
 
 ```bash
-cd contracts
-npm install
-npm test
-```
+cd contracts && npm test   # contract tests, in-process chain
 
-**Backend integration tests** (supertest against a real Postgres test DB and
-a real local Hardhat chain — both need to be running):
-
-```bash
-docker compose up -d --wait postgres hardhat-node
+# backend integration tests -- see TESTING.md for the full sequence
+docker compose --profile local-chain up -d postgres hardhat-node
 docker compose exec postgres psql -U dapp -d dapp -c "CREATE DATABASE dapp_test;"
-
-cd contracts && npm run deploy:localhost   # writes the contract address the tests read
-
-cd ../backend
-npm install
-DATABASE_URL="postgresql://dapp:dapp@localhost:5433/dapp_test?schema=public" npx prisma migrate deploy
-npm run test:integration
+cd contracts && npm run deploy:localhost
+cd ../backend && npm run test:integration
 ```
-
-(`.github/workflows/ci.yml` runs exactly this sequence, plus a full-stack
-deployment smoke test, on the self-hosted runner.)
 
 ## CI/CD
 
@@ -108,5 +99,6 @@ infra/        Self-hosted GitHub Actions runner setup notes
 .github/      CI workflow
 ```
 
-See `SECURITY.md` for the custodial wallet model's tradeoffs before using
-any of this beyond local testing.
+See `TESTING.md` for local/Sepolia testing guides, `DEPLOYMENT.md` for
+deploying `Marketplace.sol`, and `SECURITY.md` for the wallet model and its
+tradeoffs.

@@ -1,5 +1,5 @@
 import type { RequestHandler } from "express";
-import { createOrderSchema } from "./schemas.js";
+import { createOrderSchema, submitTxSchema } from "./schemas.js";
 import * as orderService from "./service.js";
 import { serializeOrder } from "../../utils/serialize.js";
 import { HttpError } from "../../utils/httpError.js";
@@ -16,17 +16,29 @@ function parseOrderId(raw: string): number {
 export const purchaseHandler: RequestHandler = async (req, res, next) => {
   try {
     const input = createOrderSchema.parse(req.body);
-    const order = await orderService.purchase(req.user!.sub, input);
-    res.status(201).json(serializeOrder(order));
+    const { order, sellerWalletAddress } = await orderService.purchase(req.user!.sub, input);
+    res.status(201).json({ ...serializeOrder(order), sellerWalletAddress });
   } catch (err) {
     next(err);
   }
 };
 
-export const confirmDeliveryHandler: RequestHandler = async (req, res, next) => {
+export const submitPurchaseTxHandler: RequestHandler = async (req, res, next) => {
   try {
     const orderId = parseOrderId(getParam(req.params.id));
-    const order = await orderService.confirmDelivery(orderId, req.user!.sub);
+    const { txHash } = submitTxSchema.parse(req.body);
+    const order = await orderService.submitPurchaseTx(orderId, req.user!.sub, txHash);
+    res.json(serializeOrder(order));
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const submitConfirmTxHandler: RequestHandler = async (req, res, next) => {
+  try {
+    const orderId = parseOrderId(getParam(req.params.id));
+    const { txHash } = submitTxSchema.parse(req.body);
+    const order = await orderService.submitConfirmTx(orderId, req.user!.sub, txHash);
     res.json(serializeOrder(order));
   } catch (err) {
     next(err);

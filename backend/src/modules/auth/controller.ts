@@ -31,3 +31,12 @@ export const loginHandler: RequestHandler = async (req, res, next) => {
     next(err);
   }
 };
+
+export const getBalanceHandler: RequestHandler = async (req, res, next) => {
+  try {
+    const balance = await authService.getWalletBalance(req.user!.sub);
+    res.json(balance);
+  } catch (err) {
+    next(err);
+  }
+};

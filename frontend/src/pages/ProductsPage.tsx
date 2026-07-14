@@ -1,8 +1,14 @@
 import { useEffect, useState } from "react";
-import { listProducts, purchaseProduct } from "../api/client";
+import { listProducts, purchaseProduct, submitPurchaseTx } from "../api/client";
 import { useAuth } from "../context/AuthContext";
 import type { Product } from "../api/types";
 import { weiToEth } from "../utils/format";
+import { ensureNetwork, getSigner } from "../web3/wallet";
+import { getContractInfoCached, getMarketplaceContract } from "../web3/contract";
+
+function isUserRejection(err: unknown): boolean {
+  return typeof err === "object" && err !== null && "code" in err && (err as { code: unknown }).code === "ACTION_REJECTED";
+}
 
 export default function ProductsPage() {
   const { user, token } = useAuth();
@@ -26,14 +32,32 @@ export default function ProductsPage() {
 
   async function handleBuy(productId: string) {
     if (!token) return;
+    if (!user?.walletAddress) {
+      setMessage("Connect a wallet before buying (see the nav bar).");
+      return;
+    }
     setMessage(null);
     const quantity = quantities[productId] ?? 1;
     try {
-      await purchaseProduct(token, productId, quantity);
+      const order = await purchaseProduct(token, productId, quantity);
+      const { chainId } = await getContractInfoCached();
+      await ensureNetwork(chainId);
+      const signer = await getSigner();
+      const contract = await getMarketplaceContract(signer);
+      const totalPriceWei = BigInt(order.totalPriceWei);
+      const tx = await contract.purchase!(order.id, order.sellerWalletAddress, totalPriceWei, {
+        value: totalPriceWei,
+      });
+      setMessage("Transaction submitted, waiting for confirmation...");
+      await submitPurchaseTx(token, order.id, tx.hash);
       setMessage("Purchase escrowed! Check My Orders to confirm delivery once it arrives.");
       await refresh();
     } catch (err) {
-      setMessage(err instanceof Error ? err.message : "Purchase failed");
+      if (isUserRejection(err)) {
+        setMessage("Transaction rejected in wallet.");
+      } else {
+        setMessage(err instanceof Error ? err.message : "Purchase failed");
+      }
     }
   }
 
@@ -47,6 +71,7 @@ export default function ProductsPage() {
       <div className="grid">
         {products.map((p) => (
           <div className="card" key={p.id}>
+            {p.imageUrl && <img src={p.imageUrl} alt={p.name} className="product-image" />}
             <h3>{p.name}</h3>
             <p>{p.description}</p>
             <p>

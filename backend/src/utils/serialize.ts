@@ -6,6 +6,7 @@ export function serializeProduct(product: Product) {
     sellerId: product.sellerId,
     name: product.name,
     description: product.description,
+    imageUrl: product.imageUrl,
     priceWei: product.priceWei.toString(),
     stockQty: product.stockQty,
     createdAt: product.createdAt,

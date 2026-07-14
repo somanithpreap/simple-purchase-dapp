@@ -11,20 +11,32 @@ export function getProvider(): ethers.JsonRpcProvider {
   // cacheTimeout disabled: Hardhat mines instantly, so ethers' default 250ms
   // read-call cache can serve a stale nonce for a signer's very next
   // transaction, causing spurious "nonce too low" errors.
-  provider ??= new ethers.JsonRpcProvider(env.HARDHAT_RPC_URL, undefined, { cacheTimeout: -1 });
+  provider ??= new ethers.JsonRpcProvider(env.RPC_URL, undefined, { cacheTimeout: -1 });
   return provider;
 }
 
 let cachedAddress: string | undefined;
 
 /**
- * Reads the deployed contract address written by `hardhat ignition deploy`
- * (see contracts/ignition/modules/Marketplace.ts). Retries briefly since in
- * Docker Compose the backend can start before the one-shot deploy service
- * has finished writing the file.
+ * Resolves the deployed Marketplace contract address. If CONTRACT_ADDRESS is
+ * set (e.g. for Sepolia, where there's no local one-shot deploy step), it's
+ * used directly. Otherwise falls back to reading the address written by
+ * `hardhat ignition deploy` (see contracts/ignition/modules/Marketplace.ts)
+ * at CONTRACT_ADDRESS_FILE, retrying briefly since in Docker Compose the
+ * backend can start before the one-shot deploy service has finished writing
+ * the file.
  */
 export async function getContractAddress(): Promise<string> {
   if (cachedAddress) return cachedAddress;
+
+  if (env.CONTRACT_ADDRESS) {
+    cachedAddress = env.CONTRACT_ADDRESS;
+    return cachedAddress;
+  }
+
+  if (!env.CONTRACT_ADDRESS_FILE) {
+    throw new Error("Either CONTRACT_ADDRESS or CONTRACT_ADDRESS_FILE must be set");
+  }
 
   const maxAttempts = 30;
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {

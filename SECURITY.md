@@ -1,49 +1,48 @@
 # Security notes
 
 This project is a demo/test build of an e-commerce DApp, not a
-production-ready system. The custodial wallet model in particular makes
-tradeoffs that would be unacceptable for handling real funds.
+production-ready system.
 
-## Custodial wallet model
+## Non-custodial wallet model
 
-Every user gets an EVM keypair generated on the backend at registration
-time. The private key is encrypted (AES-256-GCM, key from the
-`ENCRYPTION_KEY` env var) and stored in Postgres; the backend decrypts it
-and signs transactions on the user's behalf when they call the purchase /
-confirm-delivery endpoints.
+Users connect their own wallet (MetaMask, or any injected `window.ethereum`
+provider) and sign every `purchase()` / `confirmDelivery()` transaction
+themselves in the browser. The backend never holds, generates, or has
+access to a user's private key -- it only:
 
-This means:
+1. Issues a one-time nonce and verifies a signature over it (`POST
+   /wallet/nonce`, `POST /wallet/connect`) to link a wallet address to an
+   account. This proves *ownership* of the address; it never asks for or
+   sees a private key.
+2. After the user submits a transaction client-side, independently fetches
+   the transaction receipt and decodes the contract's own event logs
+   (`backend/src/blockchain/verifyTx.ts`) to confirm what actually happened
+   on-chain before updating order state -- it never trusts a client-supplied
+   transaction hash at face value.
 
-- The backend process has access to plaintext private keys in memory during
-  every signing operation.
-- Key confidentiality reduces entirely to the confidentiality of
-  `ENCRYPTION_KEY` and the security of the database and backend host. Anyone
-  with both the DB and the encryption key can drain every user's wallet.
-- There is no user-side confirmation step (e.g. a wallet extension prompt)
-  before a transaction is signed and sent -- the API endpoint itself is the
-  only authorization boundary.
+This means a compromised backend can misrepresent order/product state in
+Postgres, but cannot move a user's funds -- there is no key for it to
+extract, and every fund movement requires the user's own wallet signature.
 
-This tradeoff is intentional for this build: it lets purchase and
-delivery-confirmation flows be exercised end-to-end (including in
-automated tests) without a browser wallet extension. It is not a pattern to
-carry into a system handling real value. A production version would use
-client-side signing (e.g. a wallet extension or WalletConnect) so the
-backend never touches private keys at all.
+## Faucet accounts (local Hardhat dev only)
 
-## Faucet account
-
-`FAUCET_PRIVATE_KEY` defaults to one of Hardhat's 20 built-in test accounts
--- its private key is published in Hardhat's own documentation and is
-funded only on ephemeral local/test chains. Never point this configuration
-at a real network; the account has no real funds and the key is public
-knowledge.
+The old backend-managed faucet that auto-funded every new user's custodial
+wallet has been removed along with custodial signing. For local Hardhat
+development, import one of Hardhat's 20 well-known dev accounts directly
+into MetaMask (their private keys are published in Hardhat's own
+documentation and are funded only on ephemeral local/test chains -- never
+point them at a real network). For Sepolia, users fund their own wallet
+from a public testnet faucet.
 
 ## Secrets in this repo
 
-`backend/.env.test` is committed intentionally: it contains only the
-well-known Hardhat test key above and `localhost` connection strings, no
-real secrets, and CI needs it to run the integration suite. `backend/.env`
-and any other `.env` file are gitignored and must never be committed.
+`backend/.env.test` is committed intentionally: it contains only
+`localhost` connection strings and a test JWT secret, no real secrets, and
+CI needs it to run the integration suite. `backend/.env` and any other
+`.env` file are gitignored and must never be committed. `SEPOLIA_RPC_URL`
+and `SEPOLIA_DEPLOYER_PRIVATE_KEY` (see `.env.example`) are contracts-deploy
+-only, used once locally via `npm run deploy:sepolia`, and must never be
+committed either.
 
 ## JWT secret
 
